@@ -80,21 +80,33 @@ export default function Dashboard({ initialSymbol }) {
             setLoading(true);
             setError("");
 
-            const [stockData, historyData, watched] = await Promise.all([
+            const [stockRes, historyRes, watchedRes] = await Promise.allSettled([
                 getStock(clean),
                 getStockHistory(clean, range),
                 isInWatchlist(clean)
             ]);
 
-            if (!stockData.success) {
-                throw new Error(stockData.message || "Unable to fetch stock");
+            if (stockRes.status === "fulfilled" && stockRes.value?.success) {
+                setStock(stockRes.value);
+                setSymbol(clean);
+                setSearchInput(clean);
+            } else {
+                const errMsg =
+                    stockRes.status === "fulfilled"
+                        ? stockRes.value?.message
+                        : stockRes.reason?.response?.data?.message || stockRes.reason?.message;
+                throw new Error(errMsg || "Unable to fetch stock data");
             }
 
-            setStock(stockData);
-            setSymbol(clean);
-            setSearchInput(clean);
-            setHistory(historyData.success ? (historyData.data || []) : []);
-            setInWatchlist(watched);
+            if (historyRes.status === "fulfilled" && historyRes.value?.success) {
+                setHistory(historyRes.value.data || []);
+            } else {
+                setHistory([]);
+            }
+
+            if (watchedRes.status === "fulfilled") {
+                setInWatchlist(!!watchedRes.value);
+            }
 
         } catch (err) {
             setError(
