@@ -1,9 +1,20 @@
 import axios from "axios";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api/stocks`
-        : "http://localhost:5000/api/stocks";
+const rawApiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/+$/, "") : "";
+const API_BASE_URL = rawApiUrl ? `${rawApiUrl}/api/stocks` : "http://localhost:5000/api/stocks";
+
+const isProductionHttpsWithLocalhost =
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:" &&
+    (!rawApiUrl || API_BASE_URL.startsWith("http://localhost") || API_BASE_URL.startsWith("http://127.0.0.1"));
+
+if (isProductionHttpsWithLocalhost && !window._stockflow_warned) {
+    window._stockflow_warned = true;
+    console.warn(
+        "[StockFlow] The frontend is running on HTTPS, but VITE_API_URL is missing or set to localhost. " +
+        "To get live stock data, deploy your backend (e.g. to Render) and add VITE_API_URL=<your-backend-url> in your Vercel Project Settings."
+    );
+}
 
 const TWELVE_DATA_KEY = import.meta.env.VITE_TWELVE_DATA_API_KEY;
 
@@ -319,22 +330,24 @@ export const getStock = async (symbol, options = {}) => {
     const promise = (async () => {
         try {
             // 1. Try Backend API
-            const response = await axios.get(
-                `${API_BASE_URL}/${clean}`,
-                { timeout: 7000 }
-            );
+            if (!isProductionHttpsWithLocalhost) {
+                try {
+                    const response = await axios.get(
+                        `${API_BASE_URL}/${clean}`,
+                        { timeout: 7000 }
+                    );
 
-            if (response.data && response.data.success !== false) {
-                clientQuoteCache.set(clean, {
-                    data: response.data,
-                    expiresAt: Date.now() + CLIENT_QUOTE_TTL
-                });
-                return response.data;
+                    if (response.data && response.data.success !== false) {
+                        clientQuoteCache.set(clean, {
+                            data: response.data,
+                            expiresAt: Date.now() + CLIENT_QUOTE_TTL
+                        });
+                        return response.data;
+                    }
+                } catch (backendErr) {
+                    console.warn(`Backend fetch failed for ${clean}:`, backendErr.message);
+                }
             }
-            throw new Error(response.data?.message || "Invalid backend response");
-
-        } catch (error) {
-            console.warn(`Backend fetch failed for ${clean}:`, error.message);
 
             // 2. Direct Twelve Data fallback if API key exists
             if (TWELVE_DATA_KEY) {
@@ -426,25 +439,27 @@ export const getStockHistory = async (
     const promise = (async () => {
         try {
             // 1. Try Backend API
-            const response = await axios.get(
-                `${API_BASE_URL}/${clean}/history`,
-                {
-                    params: { range },
-                    timeout: 8000
+            if (!isProductionHttpsWithLocalhost) {
+                try {
+                    const response = await axios.get(
+                        `${API_BASE_URL}/${clean}/history`,
+                        {
+                            params: { range },
+                            timeout: 8000
+                        }
+                    );
+
+                    if (response.data && response.data.success !== false) {
+                        clientHistoryCache.set(cacheKey, {
+                            data: response.data,
+                            expiresAt: Date.now() + CLIENT_HISTORY_TTL
+                        });
+                        return response.data;
+                    }
+                } catch (backendErr) {
+                    console.warn(`Backend history fetch failed for ${clean}:${range}:`, backendErr.message);
                 }
-            );
-
-            if (response.data && response.data.success !== false) {
-                clientHistoryCache.set(cacheKey, {
-                    data: response.data,
-                    expiresAt: Date.now() + CLIENT_HISTORY_TTL
-                });
-                return response.data;
             }
-            throw new Error(response.data?.message || "Invalid history response");
-
-        } catch (error) {
-            console.warn(`Backend history fetch failed for ${clean}:${range}:`, error.message);
 
             // 2. Direct Twelve Data fallback
             if (TWELVE_DATA_KEY) {
@@ -519,17 +534,19 @@ export const searchStocks = async (query) => {
 
     const clean = query.trim();
 
-    try {
-        const response = await axios.get(
-            `${API_BASE_URL}/search`,
-            { params: { q: clean }, timeout: 5000 }
-        );
+    if (!isProductionHttpsWithLocalhost) {
+        try {
+            const response = await axios.get(
+                `${API_BASE_URL}/search`,
+                { params: { q: clean }, timeout: 5000 }
+            );
 
-        if (response.data?.results) {
-            return response.data.results;
+            if (response.data?.results) {
+                return response.data.results;
+            }
+        } catch (error) {
+            console.warn("Backend search failed, using local filter:", error.message);
         }
-    } catch (error) {
-        console.warn("Backend search failed, using local filter:", error.message);
     }
 
     // Local symbol search fallback

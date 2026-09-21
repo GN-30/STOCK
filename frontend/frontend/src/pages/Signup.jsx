@@ -11,7 +11,7 @@ import {
     Zap
 } from "lucide-react";
 
-import { signUp, signInAsGuest } from "../services/authService";
+import { signUp, signInAsGuest, resendVerificationEmail } from "../services/authService";
 
 import "../styles/auth.css";
 
@@ -32,6 +32,8 @@ function Signup() {
     const [guestLoading, setGuestLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [showResend, setShowResend] = useState(false);
+    const [resending, setResending] = useState(false);
 
     const handleGuestLogin = async () => {
         setError("");
@@ -131,8 +133,9 @@ function Signup() {
             } else {
 
                 setSuccess(
-                    "Account created successfully. Please check your email to confirm your account."
+                    `Account created! A verification link has been sent to ${email.trim()}. Please check your Inbox and Spam/Junk folder to verify.`
                 );
+                setShowResend(true);
 
             }
 
@@ -150,6 +153,23 @@ function Signup() {
 
             setLoading(false);
 
+        }
+    };
+
+    const handleResend = async () => {
+        if (!email.trim()) {
+            setError("Please enter your email address to resend.");
+            return;
+        }
+        try {
+            setResending(true);
+            setError("");
+            await resendVerificationEmail(email.trim());
+            setSuccess(`Verification email resent to ${email.trim()}! Please check your Inbox and Spam/Junk folder.`);
+        } catch (err) {
+            setError(err.message || "Failed to resend verification email.");
+        } finally {
+            setResending(false);
         }
     };
 
@@ -303,6 +323,28 @@ function Signup() {
                         <div className="auth-message success">
 
                             {success}
+
+                            {showResend && (
+                                <div style={{ marginTop: "12px" }}>
+                                    <button
+                                        type="button"
+                                        onClick={handleResend}
+                                        disabled={resending}
+                                        style={{
+                                            background: "rgba(16, 185, 129, 0.2)",
+                                            border: "1px solid rgba(16, 185, 129, 0.5)",
+                                            color: "#10b981",
+                                            padding: "6px 14px",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "0.82rem",
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {resending ? "Resending..." : "Didn't receive email? Resend"}
+                                    </button>
+                                </div>
+                            )}
 
                         </div>
 

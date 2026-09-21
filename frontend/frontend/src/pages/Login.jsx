@@ -10,7 +10,7 @@ import {
     Zap
 } from "lucide-react";
 
-import { signIn, signInAsGuest } from "../services/authService";
+import { signIn, signInAsGuest, resendVerificationEmail } from "../services/authService";
 
 import "../styles/auth.css";
 
@@ -26,6 +26,8 @@ function Login() {
     const [guestLoading, setGuestLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [showResend, setShowResend] = useState(false);
+    const [resending, setResending] = useState(false);
 
 
     // ==========================================
@@ -37,6 +39,7 @@ function Login() {
 
         setError("");
         setSuccess("");
+        setShowResend(false);
 
         if (!email.trim()) {
             setError("Please enter your email address.");
@@ -81,6 +84,11 @@ function Login() {
                 setError(
                     "Supabase backend is unreachable (domain paused or offline). Click 'Continue as Guest' below to test the app."
                 );
+            } else if (err.message?.toLowerCase().includes("email not confirmed")) {
+                setError(
+                    "Your email has not been verified yet. Please check your inbox and Spam/Junk folder, or click Resend below."
+                );
+                setShowResend(true);
             } else {
                 setError(
                     err.message ||
@@ -90,6 +98,24 @@ function Login() {
 
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        if (!email.trim()) {
+            setError("Please enter your email address above to resend verification.");
+            return;
+        }
+        try {
+            setResending(true);
+            setError("");
+            await resendVerificationEmail(email.trim());
+            setSuccess("Verification email resent! Please check your inbox and Spam/Junk folder.");
+            setShowResend(false);
+        } catch (err) {
+            setError(err.message || "Failed to resend verification email.");
+        } finally {
+            setResending(false);
         }
     };
 
@@ -246,6 +272,28 @@ function Login() {
                         <div className="auth-message error">
 
                             {error}
+
+                            {showResend && (
+                                <div style={{ marginTop: "12px" }}>
+                                    <button
+                                        type="button"
+                                        onClick={handleResend}
+                                        disabled={resending}
+                                        style={{
+                                            background: "rgba(16, 185, 129, 0.15)",
+                                            border: "1px solid rgba(16, 185, 129, 0.4)",
+                                            color: "#10b981",
+                                            padding: "6px 14px",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "0.82rem",
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {resending ? "Resending..." : "Resend Verification Email"}
+                                    </button>
+                                </div>
+                            )}
 
                         </div>
 

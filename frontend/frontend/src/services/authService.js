@@ -116,13 +116,18 @@ export const signUp = async (
     fullName
 ) => {
     try {
+        const redirectTo = typeof window !== "undefined"
+            ? `${window.location.origin}/dashboard`
+            : undefined;
+
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
                     full_name: fullName
-                }
+                },
+                emailRedirectTo: redirectTo
             }
         });
 
@@ -148,6 +153,26 @@ export const signUp = async (
         }
         throw err;
     }
+};
+
+// ==========================================
+// RESEND VERIFICATION EMAIL
+// ==========================================
+export const resendVerificationEmail = async (email) => {
+    const redirectTo = typeof window !== "undefined"
+        ? `${window.location.origin}/dashboard`
+        : undefined;
+
+    const { data, error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+            emailRedirectTo: redirectTo
+        }
+    });
+
+    if (error) throw error;
+    return data;
 };
 
 // ==========================================
