@@ -10,6 +10,9 @@ import {
     RefreshCw,
     Trash2,
     Upload,
+    Search,
+    Plus,
+    X,
     FileSpreadsheet,
     AlertCircle,
     CheckCircle2,
@@ -270,6 +273,44 @@ export default function Watchlist() {
         success,
         setSuccess
     ] = useState("");
+
+    /*
+       Search only within companies already
+       present in the watchlist.
+    */
+    const [
+        searchQuery,
+        setSearchQuery
+    ] = useState("");
+
+
+    /*
+       Manual company addition.
+    */
+    const [
+        showAddCompany,
+        setShowAddCompany
+    ] = useState(false);
+
+    const [
+        manualCompanyName,
+        setManualCompanyName
+    ] = useState("");
+
+    const [
+        manualSymbol,
+        setManualSymbol
+    ] = useState("");
+
+    const [
+        manualExchange,
+        setManualExchange
+    ] = useState("NSE");
+
+    const [
+        addingCompany,
+        setAddingCompany
+    ] = useState(false);
 
 
     /*
@@ -959,6 +1000,108 @@ export default function Watchlist() {
 
 
     /* =====================================================
+       MANUAL COMPANY ADD
+    ===================================================== */
+
+    const handleManualAdd =
+        async (event) => {
+
+            event.preventDefault();
+
+            const companyName =
+                manualCompanyName.trim();
+
+            const symbol =
+                manualSymbol
+                    .trim()
+                    .toUpperCase();
+
+            const exchange =
+                manualExchange
+                    .trim()
+                    .toUpperCase();
+
+            if (!companyName) {
+
+                setError(
+                    "Please enter the company name."
+                );
+
+                return;
+            }
+
+            if (!symbol) {
+
+                setError(
+                    "Please enter the stock symbol."
+                );
+
+                return;
+            }
+
+            const duplicate =
+                watchlist.some(
+                    item =>
+                        String(item.symbol || "")
+                            .trim()
+                            .toUpperCase() === symbol
+                );
+
+            if (duplicate) {
+
+                setError(
+                    `${symbol} is already in your watchlist.`
+                );
+
+                return;
+            }
+
+            try {
+
+                setAddingCompany(true);
+                setError("");
+                setSuccess("");
+
+                await addCompaniesToWatchlist([
+                    {
+                        companyName,
+                        symbol,
+                        exchange,
+                        country: "India"
+                    }
+                ]);
+
+                setSuccess(
+                    `${companyName} (${symbol}) added to your watchlist.`
+                );
+
+                setManualCompanyName("");
+                setManualSymbol("");
+                setManualExchange("NSE");
+                setShowAddCompany(false);
+
+                await loadWatchlist();
+
+            } catch (err) {
+
+                console.error(
+                    "Manual company add error:",
+                    err
+                );
+
+                setError(
+                    err.message ||
+                    "Unable to add the company."
+                );
+
+            } finally {
+
+                setAddingCompany(false);
+            }
+        };
+
+
+    /* =====================================================
        REFRESH
     ===================================================== */
 
@@ -1147,6 +1290,59 @@ export default function Watchlist() {
                         ).getTime()
                 );
         };
+
+
+    /* =====================================================
+       SEARCHED / REORDERED WATCHLIST
+    ===================================================== */
+
+    const displayedWatchlist = useMemo(() => {
+
+        const query =
+            searchQuery
+                .trim()
+                .toLowerCase();
+
+        if (!query) {
+            return watchlist;
+        }
+
+        const matching = [];
+        const remaining = [];
+
+        watchlist.forEach(item => {
+
+            const symbol =
+                String(
+                    item.symbol || ""
+                ).toLowerCase();
+
+            const companyName =
+                String(
+                    item.company_name ||
+                    item.companyName ||
+                    ""
+                ).toLowerCase();
+
+            if (
+                symbol.includes(query) ||
+                companyName.includes(query)
+            ) {
+                matching.push(item);
+            } else {
+                remaining.push(item);
+            }
+        });
+
+        return [
+            ...matching,
+            ...remaining
+        ];
+
+    }, [
+        watchlist,
+        searchQuery
+    ]);
 
 
     /* =====================================================
@@ -1438,20 +1634,137 @@ export default function Watchlist() {
 
                     <div className="table-header">
 
-                        <div>
+                        <div className="table-header-title">
 
-                            <h2>
-                                Watched Stocks
-                            </h2>
+                            <div>
 
-                            <span>
-                                {
-                                    watchlist.length.toLocaleString()
-                                }
-                                {" companies"}
-                            </span>
+                                <h2>
+                                    Watched Stocks
+                                </h2>
+
+                                <span>
+                                    {
+                                        watchlist.length.toLocaleString()
+                                    }
+                                    {" companies"}
+                                </span>
+
+                            </div>
 
                         </div>
+
+
+                        <div className="watchlist-tools">
+
+                            <a
+                                href="/sample-watchlist.xlsx"
+                                download="sample-watchlist.xlsx"
+                                className="sample-excel-button"
+                            >
+
+                                <FileSpreadsheet
+                                    size={16}
+                                />
+
+                                Sample Excel
+
+                            </a>
+
+
+                            <div className="watchlist-search">
+
+                                <Search
+                                    size={17}
+                                />
+
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(event) =>
+                                    setSearchQuery(
+                                        event.target.value
+                                    )
+                                }
+                                placeholder="Search company or symbol..."
+                                aria-label="Search watched companies"
+                            />
+
+                            {searchQuery && (
+
+                                <button
+                                    type="button"
+                                    className="clear-search"
+                                    onClick={() =>
+                                        setSearchQuery("")
+                                    }
+                                    title="Clear search"
+                                    aria-label="Clear search"
+                                >
+                                    ×
+                                </button>
+
+                                )}
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                className="manual-add-button"
+                                onClick={() => {
+                                    setError("");
+                                    setSuccess("");
+                                    setManualCompanyName("");
+                                    setManualSymbol("");
+                                    setManualExchange("NSE");
+                                    setShowAddCompany(true);
+                                }}
+                                title="Add company manually"
+                                aria-label="Add company manually"
+                            >
+
+                                <Plus
+                                    size={17}
+                                />
+
+                                <span>Add Company</span>
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    <div className="watchlist-format-note">
+
+                        <FileSpreadsheet
+                            size={16}
+                        />
+
+                        <span>
+                            <strong>
+                                Excel format:
+                            </strong>
+                            {" "}
+                            Explore the
+                            {" "}
+                            <a
+                                href="/sample-watchlist.xlsx"
+                                download="sample-watchlist.xlsx"
+                            >
+                                Sample Excel
+                            </a>
+                            {" "}
+                            first to understand the format.
+                            Use the columns
+                            {" "}
+                            <strong>
+                                Company Name, Symbol, Exchange, Country
+                            </strong>
+                            {" "}
+                            when uploading your own file.
+                        </span>
 
                     </div>
 
@@ -1509,11 +1822,28 @@ export default function Watchlist() {
 
                             <tbody>
 
-                                {watchlist.map(
-                                    (
-                                        item,
-                                        index
-                                    ) => {
+                                {displayedWatchlist.length === 0 ? (
+
+                                    <tr>
+
+                                        <td
+                                            colSpan="10"
+                                            className="search-empty-row"
+                                        >
+                                            No companies found for
+                                            {" "}
+                                            "{searchQuery}"
+                                        </td>
+
+                                    </tr>
+
+                                ) : (
+
+                                    displayedWatchlist.map(
+                                        (
+                                            item,
+                                            index
+                                        ) => {
 
                                         const stock =
                                             stockData[
@@ -1769,6 +2099,7 @@ export default function Watchlist() {
 
                                         );
                                     }
+                                    )
                                 )}
 
                             </tbody>
@@ -2404,6 +2735,205 @@ export default function Watchlist() {
 
 
             {/* =================================================
+                MANUAL ADD COMPANY MODAL
+            ================================================= */}
+
+            {showAddCompany && (
+
+                <div
+                    className="manual-add-overlay"
+                    onMouseDown={(event) => {
+
+                        if (
+                            event.target ===
+                            event.currentTarget
+                        ) {
+                            setShowAddCompany(false);
+                        }
+
+                    }}
+                >
+
+                    <div className="manual-add-modal">
+
+                        <div className="manual-add-modal-header">
+
+                            <div>
+
+                                <h2>
+                                    Add Company
+                                </h2>
+
+                                <p>
+                                    Add a company manually to your watchlist.
+                                </p>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                className="modal-close-button"
+                                onClick={() =>
+                                    setShowAddCompany(false)
+                                }
+                                aria-label="Close"
+                            >
+
+                                <X
+                                    size={19}
+                                />
+
+                            </button>
+
+                        </div>
+
+
+                        <form
+                            onSubmit={
+                                handleManualAdd
+                            }
+                        >
+
+                            <label>
+                                Company Name
+
+                                <input
+                                    type="text"
+                                    value={
+                                        manualCompanyName
+                                    }
+                                    onChange={(event) =>
+                                        setManualCompanyName(
+                                            event.target.value
+                                        )
+                                    }
+                                    placeholder="e.g. Infosys Limited"
+                                    autoFocus
+                                />
+
+                            </label>
+
+
+                            <label>
+                                Stock Symbol
+
+                                <input
+                                    type="text"
+                                    value={
+                                        manualSymbol
+                                    }
+                                    onChange={(event) =>
+                                        setManualSymbol(
+                                            event.target.value
+                                        )
+                                    }
+                                    placeholder="e.g. INFY"
+                                />
+
+                            </label>
+
+
+                            <label>
+                                Exchange
+
+                                <select
+                                    value={
+                                        manualExchange
+                                    }
+                                    onChange={(event) =>
+                                        setManualExchange(
+                                            event.target.value
+                                        )
+                                    }
+                                >
+
+                                    <option value="NSE">
+                                        NSE
+                                    </option>
+
+                                    <option value="BSE">
+                                        BSE
+                                    </option>
+
+                                </select>
+
+                            </label>
+
+
+                            <div className="manual-add-format-hint">
+
+                                <FileSpreadsheet
+                                    size={15}
+                                />
+
+                                <span>
+                                    You can also upload multiple
+                                    companies using the
+                                    {" "}
+                                    <a
+                                        href="/sample-watchlist.xlsx"
+                                        download="sample-watchlist.xlsx"
+                                    >
+                                        sample Excel format
+                                    </a>.
+                                </span>
+
+                            </div>
+
+
+                            <div className="manual-add-modal-actions">
+
+                                <button
+                                    type="button"
+                                    className="modal-cancel-button"
+                                    onClick={() =>
+                                        setShowAddCompany(false)
+                                    }
+                                >
+                                    Cancel
+                                </button>
+
+
+                                <button
+                                    type="submit"
+                                    className="modal-add-button"
+                                    disabled={
+                                        addingCompany
+                                    }
+                                >
+
+                                    {addingCompany ? (
+                                        <>
+                                            <Loader2
+                                                size={16}
+                                                className="spin"
+                                            />
+                                            Adding...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus
+                                                size={16}
+                                            />
+                                            Add Company
+                                        </>
+                                    )}
+
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+            )}
+
+
+            {/* =================================================
                 CSS
             ================================================= */}
 
@@ -2541,7 +3071,8 @@ export default function Watchlist() {
 
 
                 .excel-upload-button,
-                .refresh-button {
+                .refresh-button,
+                .manual-add-button {
 
                     display:
                         inline-flex;
@@ -2601,6 +3132,56 @@ export default function Watchlist() {
                     box-shadow:
                         0 0 25px
                         rgba(53,239,135,0.14);
+
+                }
+
+
+                .manual-add-button {
+
+                    min-width:
+                        112px;
+
+                    height:
+                        40px;
+
+                    padding:
+                        0 12px;
+
+                    display:
+                        inline-flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    background:
+                        #123321 !important;
+
+                    border:
+                        1px solid #35ef87 !important;
+
+                    border-radius:
+                        9px;
+
+                    color:
+                        #35ef87 !important;
+
+                    cursor:
+                        pointer;
+
+                }
+
+
+                .manual-add-button:hover {
+
+                    background:
+                        #19472d !important;
+
+                    box-shadow:
+                        0 0 22px
+                        rgba(53,239,135,0.12);
 
                 }
 
@@ -2832,13 +3413,120 @@ export default function Watchlist() {
                 .table-header {
 
                     padding:
-                        18px 21px;
+                        14px 18px;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        space-between;
+
+                    gap:
+                        18px;
 
                     background:
                         #111a16 !important;
 
                     border-bottom:
                         1px solid #1d2a24;
+
+                }
+
+
+                .table-header-title {
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    min-width:
+                        0;
+
+                }
+
+
+                .watchlist-tools {
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    gap:
+                        9px;
+
+                    flex-shrink:
+                        0;
+
+                }
+
+
+                .sample-excel-button {
+
+                    height:
+                        40px;
+
+                    display:
+                        inline-flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    gap:
+                        7px;
+
+                    padding:
+                        0 12px;
+
+                    border:
+                        1px solid #26372e;
+
+                    border-radius:
+                        9px;
+
+                    background:
+                        #14201a;
+
+                    color:
+                        #a9b9b0;
+
+                    font-size:
+                        12px;
+
+                    font-weight:
+                        700;
+
+                    text-decoration:
+                        none;
+
+                    white-space:
+                        nowrap;
+
+                    transition:
+                        all 0.2s ease;
+
+                }
+
+
+                .sample-excel-button:hover {
+
+                    background:
+                        #1a2a21;
+
+                    border-color:
+                        #35ef87;
+
+                    color:
+                        #35ef87;
 
                 }
 
@@ -2870,6 +3558,255 @@ export default function Watchlist() {
 
                     font-size:
                         12px;
+
+                }
+
+
+                /* =================================================
+                   WATCHLIST SEARCH
+                ================================================= */
+
+                .watchlist-search {
+
+                    width:
+                        min(330px, 100%);
+
+                    height:
+                        40px;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    gap:
+                        9px;
+
+                    padding:
+                        0 11px;
+
+                    border:
+                        1px solid #29372f;
+
+                    border-radius:
+                        9px;
+
+                    background:
+                        #0d1511;
+
+                    color:
+                        #708078;
+
+                    flex-shrink:
+                        0;
+
+                    transition:
+                        border-color 0.2s ease,
+                        box-shadow 0.2s ease;
+
+                }
+
+
+                .watchlist-search:focus-within {
+
+                    border-color:
+                        #35ef87;
+
+                    box-shadow:
+                        0 0 0 3px
+                        rgba(53,239,135,0.07);
+
+                }
+
+
+                .watchlist-search input {
+
+                    width:
+                        100%;
+
+                    min-width:
+                        0;
+
+                    border:
+                        none;
+
+                    outline:
+                        none;
+
+                    background:
+                        transparent;
+
+                    color:
+                        #e5eee9;
+
+                    font-size:
+                        13px;
+
+                }
+
+
+                .watchlist-search input::placeholder {
+
+                    color:
+                        #63736b;
+
+                }
+
+
+                .clear-search {
+
+                    width:
+                        22px;
+
+                    height:
+                        22px;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    padding:
+                        0;
+
+                    border:
+                        none;
+
+                    border-radius:
+                        50%;
+
+                    background:
+                        #1d2923;
+
+                    color:
+                        #91a099;
+
+                    font-size:
+                        17px;
+
+                    line-height:
+                        1;
+
+                    cursor:
+                        pointer;
+
+                    flex-shrink:
+                        0;
+
+                }
+
+
+                .clear-search:hover {
+
+                    background:
+                        #293a31;
+
+                    color:
+                        #ffffff;
+
+                }
+
+
+                .search-empty-row td {
+
+                    padding:
+                        35px 20px !important;
+
+                    text-align:
+                        center;
+
+                    color:
+                        #718279 !important;
+
+                    background:
+                        #111a16 !important;
+
+                }
+
+
+                .watchlist-format-note {
+
+                    display:
+                        flex;
+
+                    align-items:
+                        flex-start;
+
+                    gap:
+                        9px;
+
+                    margin:
+                        0 18px 12px;
+
+                    padding:
+                        10px 12px;
+
+                    border:
+                        1px solid #25362d;
+
+                    border-radius:
+                        9px;
+
+                    background:
+                        #0d1712;
+
+                    color:
+                        #788980;
+
+                    font-size:
+                        12px;
+
+                    line-height:
+                        1.5;
+
+                }
+
+
+                .watchlist-format-note svg {
+
+                    color:
+                        #35ef87;
+
+                    flex-shrink:
+                        0;
+
+                    margin-top:
+                        2px;
+
+                }
+
+
+                .watchlist-format-note strong {
+
+                    color:
+                        #b9c8c0;
+
+                }
+
+
+                .watchlist-format-note a {
+
+                    color:
+                        #35ef87;
+
+                    font-weight:
+                        700;
+
+                    text-decoration:
+                        none;
+
+                }
+
+
+                .watchlist-format-note a:hover {
+
+                    text-decoration:
+                        underline;
 
                 }
 
@@ -3845,6 +4782,436 @@ export default function Watchlist() {
 
 
                 /* =================================================
+                   MANUAL ADD COMPANY MODAL
+                ================================================= */
+
+                .manual-add-overlay {
+
+                    position:
+                        fixed;
+
+                    inset:
+                        0;
+
+                    z-index:
+                        1000;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    padding:
+                        20px;
+
+                    background:
+                        rgba(0,0,0,0.72);
+
+                    backdrop-filter:
+                        blur(7px);
+
+                }
+
+
+                .manual-add-modal {
+
+                    width:
+                        min(460px, 100%);
+
+                    max-height:
+                        calc(100vh - 40px);
+
+                    overflow-y:
+                        auto;
+
+                    padding:
+                        22px;
+
+                    border:
+                        1px solid #2b3e34;
+
+                    border-radius:
+                        16px;
+
+                    background:
+                        #111a16;
+
+                    box-shadow:
+                        0 25px 80px
+                        rgba(0,0,0,0.55);
+
+                }
+
+
+                .manual-add-modal-header {
+
+                    display:
+                        flex;
+
+                    align-items:
+                        flex-start;
+
+                    justify-content:
+                        space-between;
+
+                    gap:
+                        15px;
+
+                    margin-bottom:
+                        20px;
+
+                }
+
+
+                .manual-add-modal-header h2 {
+
+                    margin:
+                        0;
+
+                    color:
+                        #f1f7f3;
+
+                    font-size:
+                        20px;
+
+                }
+
+
+                .manual-add-modal-header p {
+
+                    margin:
+                        5px 0 0;
+
+                    color:
+                        #718279;
+
+                    font-size:
+                        12px;
+
+                }
+
+
+                .modal-close-button {
+
+                    width:
+                        34px;
+
+                    height:
+                        34px;
+
+                    display:
+                        flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    border:
+                        1px solid #293930;
+
+                    border-radius:
+                        8px;
+
+                    background:
+                        #16211b;
+
+                    color:
+                        #9aaba2;
+
+                    cursor:
+                        pointer;
+
+                }
+
+
+                .modal-close-button:hover {
+
+                    color:
+                        #ffffff;
+
+                    border-color:
+                        #3b5145;
+
+                }
+
+
+                .manual-add-modal form {
+
+                    display:
+                        flex;
+
+                    flex-direction:
+                        column;
+
+                    gap:
+                        15px;
+
+                }
+
+
+                .manual-add-modal label {
+
+                    display:
+                        flex;
+
+                    flex-direction:
+                        column;
+
+                    gap:
+                        7px;
+
+                    color:
+                        #aebdb4;
+
+                    font-size:
+                        12px;
+
+                    font-weight:
+                        700;
+
+                }
+
+
+                .manual-add-modal input,
+                .manual-add-modal select {
+
+                    width:
+                        100%;
+
+                    height:
+                        42px;
+
+                    padding:
+                        0 12px;
+
+                    border:
+                        1px solid #293930;
+
+                    border-radius:
+                        9px;
+
+                    outline:
+                        none;
+
+                    background:
+                        #0d1511;
+
+                    color:
+                        #e3ece7;
+
+                    font-size:
+                        13px;
+
+                }
+
+
+                .manual-add-modal input:focus,
+                .manual-add-modal select:focus {
+
+                    border-color:
+                        #35ef87;
+
+                    box-shadow:
+                        0 0 0 3px
+                        rgba(53,239,135,0.06);
+
+                }
+
+
+                .manual-add-modal input::placeholder {
+
+                    color:
+                        #596a61;
+
+                }
+
+
+                .manual-add-format-hint {
+
+                    display:
+                        flex;
+
+                    align-items:
+                        flex-start;
+
+                    gap:
+                        8px;
+
+                    padding:
+                        10px 11px;
+
+                    border:
+                        1px solid #25362d;
+
+                    border-radius:
+                        8px;
+
+                    background:
+                        #0d1712;
+
+                    color:
+                        #73847b;
+
+                    font-size:
+                        11px;
+
+                    line-height:
+                        1.45;
+
+                }
+
+
+                .manual-add-format-hint svg {
+
+                    color:
+                        #35ef87;
+
+                    flex-shrink:
+                        0;
+
+                }
+
+
+                .manual-add-format-hint a {
+
+                    color:
+                        #35ef87;
+
+                    font-weight:
+                        700;
+
+                    text-decoration:
+                        none;
+
+                }
+
+
+                .manual-add-format-hint a:hover {
+
+                    text-decoration:
+                        underline;
+
+                }
+
+
+                .manual-add-modal-actions {
+
+                    display:
+                        flex;
+
+                    justify-content:
+                        flex-end;
+
+                    gap:
+                        9px;
+
+                    margin-top:
+                        4px;
+
+                }
+
+
+                .modal-cancel-button,
+                .modal-add-button {
+
+                    height:
+                        40px;
+
+                    display:
+                        inline-flex;
+
+                    align-items:
+                        center;
+
+                    justify-content:
+                        center;
+
+                    gap:
+                        7px;
+
+                    padding:
+                        0 15px;
+
+                    border-radius:
+                        9px;
+
+                    font-size:
+                        12px;
+
+                    font-weight:
+                        750;
+
+                    cursor:
+                        pointer;
+
+                }
+
+
+                .modal-cancel-button {
+
+                    border:
+                        1px solid #293930;
+
+                    background:
+                        #16211b;
+
+                    color:
+                        #9aa9a1;
+
+                }
+
+
+                .modal-cancel-button:hover {
+
+                    color:
+                        #ffffff;
+
+                    border-color:
+                        #3b5145;
+
+                }
+
+
+                .modal-add-button {
+
+                    border:
+                        1px solid #35ef87;
+
+                    background:
+                        #35ef87;
+
+                    color:
+                        #07110b;
+
+                }
+
+
+                .modal-add-button:hover {
+
+                    background:
+                        #4df596;
+
+                }
+
+
+                .modal-add-button:disabled {
+
+                    opacity:
+                        0.55;
+
+                    cursor:
+                        not-allowed;
+
+                }
+
+
+                /* =================================================
                    RESPONSIVE
                 ================================================= */
 
@@ -3865,6 +5232,48 @@ export default function Watchlist() {
                 @media (
                     max-width: 850px
                 ) {
+
+                    .table-header {
+
+                        align-items:
+                            stretch;
+
+                        flex-direction:
+                            column;
+
+                    }
+
+
+                    .watchlist-tools {
+
+                        width:
+                            100%;
+
+                        flex-wrap:
+                            wrap;
+
+                    }
+
+
+                    .watchlist-search {
+
+                        flex:
+                            1 1 220px;
+
+                        width:
+                            auto;
+
+                    }
+
+
+                    .sample-excel-button,
+                    .manual-add-button {
+
+                        flex-shrink:
+                            0;
+
+                    }
+
 
                     .watchlist-page {
 
