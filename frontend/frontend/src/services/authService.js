@@ -119,14 +119,12 @@ export const signUp = async (email, password, fullName) => {
         options: {
             data: {
                 full_name: fullName
-            },
-            emailRedirectTo: window.location.origin
+            }
         }
     });
 
     console.log("SIGNUP DATA:", data);
     console.log("SIGNUP ERROR:", error);
-    console.log("CURRENT ORIGIN:", window.location.origin);
 
     if (error) {
         console.error(
