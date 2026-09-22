@@ -6,3 +6,8 @@ const supabase = createClient(
 );
 
 module.exports = supabase;
+console.log("Supabase URL:", process.env.SUPABASE_URL);
+console.log(
+    "Supabase key exists:",
+    !!process.env.SUPABASE_KEY
+);
