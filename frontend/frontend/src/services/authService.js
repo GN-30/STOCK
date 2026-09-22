@@ -110,49 +110,35 @@ export const signInAsGuest = async () => {
 // ==========================================
 // SIGN UP
 // ==========================================
-export const signUp = async (
-    email,
-    password,
-    fullName
-) => {
-    try {
-        const redirectTo = typeof window !== "undefined"
-            ? `${window.location.origin}/dashboard`
-            : undefined;
+export const signUp = async (email, password, fullName) => {
+    console.log("Starting signup for:", email);
 
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName
-                },
-                emailRedirectTo: redirectTo
-            }
-        });
-
-        if (error) throw error;
-        return data;
-    } catch (err) {
-        // If Supabase host is unreachable (ERR_NAME_NOT_RESOLVED / Failed to fetch)
-        if (
-            err.message?.includes("fetch") ||
-            err.name === "AuthRetryableFetchError" ||
-            err.message?.includes("NetworkError")
-        ) {
-            // Provide automatic local demo user fallback
-            const localUser = {
-                id: "local-" + Date.now(),
-                email,
-                user_metadata: {
-                    full_name: fullName || email.split("@")[0]
-                }
-            };
-            const session = setLocalSession(localUser);
-            return { user: localUser, session };
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                full_name: fullName
+            },
+            emailRedirectTo: window.location.origin
         }
-        throw err;
+    });
+
+    console.log("SIGNUP DATA:", data);
+    console.log("SIGNUP ERROR:", error);
+    console.log("CURRENT ORIGIN:", window.location.origin);
+
+    if (error) {
+        console.error(
+            "Signup error:",
+            error.message,
+            error.status
+        );
+
+        throw error;
     }
+
+    return data;
 };
 
 // ==========================================
@@ -242,4 +228,4 @@ export const getCurrentUser = async () => {
     } catch {
         return null;
     }
-};
+};
