@@ -157,6 +157,7 @@ export const resendVerificationEmail = async (email) => {
 
     if (error) throw error;
     return data;
+
 };
 
 // ==========================================
